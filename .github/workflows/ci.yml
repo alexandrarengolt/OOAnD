@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Restore dependencies
+        run: dotnet restore SpaceGameSolution.sln
+
+      - name: Check Formatting in SpaceGame.Core
+        run: dotnet format SpaceGame.Core/SpaceGame.Core.csproj --verify-no-changes
+
+      - name: Check Formatting in SpaceGame.Tests
+        run: dotnet format SpaceGame.Tests/SpaceGame.Tests.csproj --verify-no-changes
+
+      - name: Build
+        run: dotnet build SpaceGameSolution.sln --no-restore --configuration Release /p:ContinuousIntegrationBuild=true
+
+      - name: Install Coverage Tools
+        run: |
+          dotnet new tool-manifest --force
+          dotnet tool install dotnet-coverage
+          dotnet tool install coverlet.console
+
+      - name: Test with Coverage
+        run: |
+          dotnet test SpaceGame.Tests/SpaceGame.Tests.csproj --no-build --configuration Release /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura
+
+      - name: Generate OpenCover Report
+        run: |
+          cd SpaceGame.Tests/
+          dotnet coverlet bin/Release/net9.0/SpaceGame.Tests.dll --target "dotnet" --targetargs "test --no-build --configuration Release" -f=opencover -o="coverage.xml"
